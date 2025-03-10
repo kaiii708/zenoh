@@ -17,8 +17,10 @@ use std::{
     convert::TryInto,
     hash::{Hash, Hasher},
     sync::{Arc, Weak},
+    fmt
 };
 
+use tokio_util::context;
 use zenoh_config::WhatAmI;
 use zenoh_protocol::{
     core::{key_expr::keyexpr, ExprId, WireExpr},
@@ -37,18 +39,22 @@ use super::{
 };
 use crate::net::routing::{dispatcher::face::Face, RoutingContext};
 
+use derive_more::Debug;
+
 pub(crate) type NodeId = u16;
 
 pub(crate) type Direction = (Arc<FaceState>, WireExpr<'static>, NodeId);
 pub(crate) type Route = HashMap<usize, Direction>;
 
 pub(crate) type QueryRoute = HashMap<usize, (Direction, RequestId)>;
+#[derive(Debug)]
 pub(crate) struct QueryTargetQabl {
     pub(crate) direction: Direction,
     pub(crate) info: Option<QueryableInfoType>,
 }
 pub(crate) type QueryTargetQablSet = Vec<QueryTargetQabl>;
 
+#[derive(Debug)]
 pub(crate) struct SessionContext {
     pub(crate) face: Arc<FaceState>,
     pub(crate) local_expr_id: Option<ExprId>,
@@ -82,7 +88,7 @@ pub(crate) struct RoutesIndexes {
     pub(crate) clients: Vec<NodeId>,
 }
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub(crate) struct DataRoutes {
     pub(crate) routers: Vec<Arc<Route>>,
     pub(crate) peers: Vec<Arc<Route>>,
@@ -104,7 +110,7 @@ impl DataRoutes {
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub(crate) struct QueryRoutes {
     pub(crate) routers: Vec<Arc<QueryTargetQablSet>>,
     pub(crate) peers: Vec<Arc<QueryTargetQablSet>>,
@@ -130,6 +136,7 @@ impl QueryRoutes {
     }
 }
 
+// #[derive(Debug)]
 pub(crate) struct ResourceContext {
     pub(crate) matches: Vec<Weak<Resource>>,
     pub(crate) hat: Box<dyn Any + Send + Sync>,
@@ -138,6 +145,54 @@ pub(crate) struct ResourceContext {
     pub(crate) valid_query_routes: bool,
     pub(crate) query_routes: QueryRoutes,
 }
+
+impl fmt::Debug for ResourceContext {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut resource_context = f.debug_struct("ResourceContext");
+        resource_context.field("matches", &self.matches.iter().filter_map(|resource|resource.upgrade()).map(|resource|resource.format_for_no_recursive()).collect::<Vec<String>>());
+        // resource_context.field("matches", &self.matches.iter().filter_map(|resource| {
+        //     resource.upgrade().map(|res| res.format_excluding_matches())
+        // }).collect::<Vec<String>>());
+        resource_context.field(
+            "data_routes.routers",
+            &format_args!(
+                "\n[{}]",
+                self.data_routes
+                    .routers
+                    .iter()
+                    .map(|router| format!("{:?}", router))
+                    .collect::<Vec<_>>()
+                    .join(",\n")
+            ),
+        );
+        resource_context.field(
+            "data_routes.peers",
+            &format_args!(
+                "\n[{}]",
+                self.data_routes
+                    .peers
+                    .iter()
+                    .map(|peer| format!("{:?}", peer))
+                    .collect::<Vec<_>>()
+                    .join(",\n")
+            ),
+        );
+        resource_context.field(
+            "data_routes.clients",
+            &format_args!(
+                "\n[{}]",
+                self.data_routes
+                    .clients
+                    .iter()
+                    .map(|client| format!("{:?}", client))
+                    .collect::<Vec<_>>()
+                    .join(",\n")
+            ),
+        );
+        resource_context.finish()
+    }
+}
+
 
 impl ResourceContext {
     fn new(hat: Box<dyn Any + Send + Sync>) -> ResourceContext {
@@ -178,6 +233,277 @@ pub struct Resource {
     pub(crate) context: Option<ResourceContext>,
     pub(crate) session_ctxs: HashMap<usize, Arc<SessionContext>>,
 }
+
+// impl fmt::Debug for Resource {
+//     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+//         writeln!(f, "Resource {{")?;
+//         writeln!(f, "    suffix: \"{}\",", self.suffix)?;
+
+//         if let Some(resource_context) = &self.context {
+//             writeln!(f, "    data_routes.routers: [")?;
+//             for router in &resource_context.data_routes.routers {
+//                 writeln!(f, "        {:?},", router)?;
+//             }
+//             writeln!(f, "    ],")?;
+
+//             writeln!(f, "    data_routes.peers: [")?;
+//             for peer in &resource_context.data_routes.peers {
+//                 writeln!(f, "        {:?},", peer)?;
+//             }
+//             writeln!(f, "    ],")?;
+
+//             writeln!(f, "    data_routes.clients: [")?;
+//             for client in &resource_context.data_routes.clients {
+//                 writeln!(f, "        {:?},", client)?;
+//             }
+//             writeln!(f, "    ],")?;
+//         }
+
+//         writeln!(f, "    children: {:?},", self.children)?;
+//         writeln!(f, "}}")
+//     }
+// }
+
+impl fmt::Debug for Resource {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut resource = f.debug_struct("Resource");
+        
+        resource.field("suffix", &self.suffix);
+        
+        if let Some(resource_context) = &self.context {
+            resource.field("resource_context", resource_context);
+            // resource.field("matches", &resource_context.matches);
+            // resource.field(
+            //     "data_routes.routers",
+            //     &format_args!(
+            //         "\n[{}]",
+            //         resource_context
+            //             .data_routes
+            //             .routers
+            //             .iter()
+            //             .map(|router| format!("{:?}", router))
+            //             .collect::<Vec<_>>()
+            //             .join(",\n")
+            //     ),
+            // );
+            // resource.field(
+            //     "data_routes.peers",
+            //     &format_args!(
+            //         "\n[{}]",
+            //         resource_context
+            //             .data_routes
+            //             .peers
+            //             .iter()
+            //             .map(|peer| format!("{:?}", peer))
+            //             .collect::<Vec<_>>()
+            //             .join(",\n")
+            //     ),
+            // );
+            // resource.field(
+            //     "data_routes.clients",
+            //     &format_args!(
+            //         "\n[{}]",
+            //         resource_context
+            //             .data_routes
+            //             .clients
+            //             .iter()
+            //             .map(|client| format!("{:?}", client))
+            //             .collect::<Vec<_>>()
+            //             .join(",\n")
+            //     ),
+            // );
+            
+            // resource
+            //     .field("data_routes.peers", &resource_context.data_routes.peers)
+            //     .field("data_routes.clients", &resource_context.data_routes.clients);
+        }
+        
+        resource.field("children", &self.children);
+        
+        resource.finish()
+    }
+}
+
+impl Resource{
+
+    pub fn format_for_no_recursive(&self) -> String {
+        format!("Resource {{ suffix: {} }}", self.suffix)
+    }
+
+    pub fn format_excluding_matches(&self) -> String {
+        let data_routes_str = match &self.context {
+            Some(ctx) => format!(
+                "data_routes: {{
+                routers: [{:#?}],
+                peers: [{:#?}],
+                clients: [{:#?}]}}",
+                ctx.data_routes.routers.iter()
+                    .map(|router| format!("{:?}", router))
+                    .collect::<Vec<_>>()
+                    .join(",\n"),
+                ctx.data_routes.peers.iter()
+                    .map(|peer| format!("{:?}", peer))
+                    .collect::<Vec<_>>()
+                    .join(",\n"),
+                ctx.data_routes.clients.iter()
+                    .map(|client| format!("{:?}", client))
+                    .collect::<Vec<_>>()
+                    .join(",\n"),
+            ),
+            None => "data_routes: None".to_string(),
+        };
+
+        format!(
+            "Resource {{ suffix: {}, children: {:?}, {}}}",
+            self.suffix,
+            self.children.keys().collect::<Vec<_>>(),
+            data_routes_str
+        )
+    }
+    
+}
+
+// impl Resource {
+//     fn fmt_with_visited(&self, f: &mut fmt::Formatter<'_>, visited: String) -> fmt::Result {
+//         if visited == self.suffix {
+//             return write!(f, "Resource with suffix {} point to itself", self.suffix);
+//         }
+//         let visited = self.suffix.clone();
+//         let mut resource = f.debug_struct("Resource");
+        
+//         resource.field("suffix", &self.suffix);
+        
+//         if let Some(resource_context) = &self.context {
+//             if resource_context
+//                         .data_routes
+//                         .routers
+//                         .iter()
+//                         .flat_map(|router|router.iter())
+//                         .any(|(_,(face_state, _,_))|face_state.contains_visited_suffix(&visited)){
+//                             return write!(f, "Face_state's Resource contains cyclic suffix references");
+//                         }
+
+
+
+
+//             resource.field("matches", &resource_context.matches);
+//             resource.field(
+//                 "data_routes.routers",
+//                 &format_args!(
+//                     "\n[{}]",
+//                     resource_context
+//                         .data_routes
+//                         .routers
+//                         .iter()
+//                         .map(|router| format!("{:?}", router))
+//                         .collect::<Vec<_>>()
+//                         .join(",\n")
+//                 ),
+//             );
+//             resource.field(
+//                 "data_routes.peers",
+//                 &format_args!(
+//                     "\n[{}]",
+//                     resource_context
+//                         .data_routes
+//                         .peers
+//                         .iter()
+//                         .map(|peer| format!("{:?}", peer))
+//                         .collect::<Vec<_>>()
+//                         .join(",\n")
+//                 ),
+//             );
+//             resource.field(
+//                 "data_routes.clients",
+//                 &format_args!(
+//                     "\n[{}]",
+//                     resource_context
+//                         .data_routes
+//                         .clients
+//                         .iter()
+//                         .map(|client| format!("{:?}", client))
+//                         .collect::<Vec<_>>()
+//                         .join(",\n")
+//                 ),
+//             );
+            
+//         }
+        
+//         resource.field("children", &self.children);
+        
+//         resource.finish()
+//     }
+
+//     pub fn has_visited_suffix(&self, visited: &str) -> bool {
+//         // 如果有 context，递归检查
+//         if let Some(context) = &self.context {
+//             if context
+//                 .matches
+//                 .iter()
+//                 .filter_map(|weak_resource| weak_resource.upgrade()) // 尝试升级 Weak<Resource>
+//                 .any(|resource| resource.suffix == visited) // 检查 suffix 是否匹配
+//                 // || context
+//                 //     .data_routes
+//                 //     .routers
+//                 //     .iter()
+//                 //     .flat_map(|router| router.iter())
+//                 //     .any(|(_, direction)| {
+//                 //         let (face_state, _, _) = direction;
+//                 //         face_state.contains_visited_suffix(visited)
+//                 //     })
+//             {
+//                 return true;
+//             }
+//             if context
+//                 .matches
+//                 .iter()
+//                 .filter_map(|weak_resource| weak_resource.upgrade()) // 尝试升级 Weak<Resource>
+//                 .any(|resource| resource.suffix == visited) // 检查 suffix 是否匹配
+//                 // || context
+//                 //     .data_routes
+//                 //     .peers
+//                 //     .iter()
+//                 //     .flat_map(|router| router.iter())
+//                 //     .any(|(_, direction)| {
+//                 //         let (face_state, _, _) = direction;
+//                 //         face_state.contains_visited_suffix(visited)
+//                 //     })
+//             {
+//                 return true;
+//             }
+//             if context
+//                 .matches
+//                 .iter()
+//                 .filter_map(|weak_resource| weak_resource.upgrade()) // 尝试升级 Weak<Resource>
+//                 .any(|resource| resource.suffix == visited) // 检查 suffix 是否匹配
+//                 // || context
+//                 //     .data_routes
+//                 //     .clients
+//                 //     .iter()
+//                 //     .flat_map(|router| router.iter())
+//                 //     .any(|(_, direction)| {
+//                 //         let (face_state, _, _) = direction;
+//                 //         face_state.contains_visited_suffix(visited)
+//                 //     })
+//             {
+//                 return true;
+//             }
+//         }
+    
+//         // 检查子节点
+//         self.children.iter().any(|(child_suffix, child_resource)| {
+//             child_suffix == visited || child_resource.has_visited_suffix(visited)
+//         })
+//     }
+// }
+
+// impl fmt::Debug for Resource {
+//     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+//         let visited = String::new();
+//         self.fmt_with_visited(f, visited)
+//     }
+    
+// }
 
 impl PartialEq for Resource {
     fn eq(&self, other: &Self) -> bool {
@@ -346,12 +672,45 @@ impl Resource {
     #[cfg(test)]
     pub fn print_tree(from: &Arc<Resource>) -> String {
         let mut result = from.expr();
+        println!("init_result:  {}",result);
+        match &from.context{
+            Some(resource_context)
+                => {
+                    println!("data_routes.routers: {:#?}",resource_context.data_routes.routers);
+                    println!("data_routes.peers: {:#?}",resource_context.data_routes.peers);
+                    println!("data_routes.clients: {:#?}",resource_context.data_routes.clients);
+                    },
+            _ => (),
+        }
         result.push('\n');
         for child in from.children.values() {
             result.push_str(&Resource::print_tree(child));
         }
         result
     }
+
+    pub fn format_one_layer(&self){
+        
+        
+    }
+    // pub fn print_resource_tree(from: &Arc<Resource>) {
+    //     let result = from.expr();
+    //     println!("full_string:  {}",result);
+    //     println!("suffix:    {}", from.suffix);
+    //     match &from.context{
+    //         Some(resource_context)
+    //             => {
+    //                 println!("data_routes.routers: {:?}",resource_context.data_routes.routers);
+    //                 println!("data_routes.peers: {:?}",resource_context.data_routes.peers);
+    //                 println!("data_routes.clients: {:?}",resource_context.data_routes.clients);
+    //                 },
+    //         _ => (),
+    //     }
+    //     for child in from.children.values() {
+    //         Resource::print_resource_tree(child);
+    //     }
+    // }
+
 
     pub fn make_resource(
         tables: &mut Tables,
@@ -415,25 +774,31 @@ impl Resource {
     pub fn get_resource(from: &Arc<Resource>, suffix: &str) -> Option<Arc<Resource>> {
         if suffix.is_empty() {
             Some(from.clone())
+        //If there is a '/'in the first
         } else if let Some(stripped_suffix) = suffix.strip_prefix('/') {
+            //get the '/' in the first off
             let (chunk, rest) = match stripped_suffix.find('/') {
                 Some(idx) => (&suffix[0..(idx + 1)], &suffix[(idx + 1)..]),
                 None => (suffix, ""),
             };
-
+            //from the hashmap in the children to get the child resource (its hash key must be the chunk)
             match from.children.get(chunk) {
+                // If there is, recursively get the rest until the last resource, return back
                 Some(res) => Resource::get_resource(res, rest),
                 None => None,
             }
+        //If there is no '/' in the first
         } else {
+            // Get the parent resource,
             match &from.parent {
+                // If there is a parent node, then get the resource from parent'children (in your same layer) and find concat your suffix and the suffix to find
                 Some(parent) => Resource::get_resource(parent, &[&from.suffix, suffix].concat()),
                 None => {
                     let (chunk, rest) = match suffix[1..].find('/') {
                         Some(idx) => (&suffix[0..(idx + 1)], &suffix[(idx + 1)..]),
                         None => (suffix, ""),
                     };
-
+                    // find the chunk from your children, and keep going
                     match from.children.get(chunk) {
                         Some(res) => Resource::get_resource(res, rest),
                         None => None,
@@ -503,6 +868,9 @@ impl Resource {
                     get_mut_unchecked(face)
                         .local_mappings
                         .insert(expr_id, nonwild_prefix.clone());
+                    // println!("'face.local_mappings' is about to be printed now.");
+                    // println!("{:?}",&face.local_mappings);
+                    // println!();
                     face.primitives.send_declare(RoutingContext::with_expr(
                         Declare {
                             interest_id: None,
@@ -687,22 +1055,31 @@ impl Resource {
             .and_then(|ctx| ctx.e_interceptor_cache.as_ref())
     }
 }
-
+//TODO see what done first before register_expr
 pub(crate) fn register_expr(
     tables: &TablesLock,
     face: &mut Arc<FaceState>,
     expr_id: ExprId,
     expr: &WireExpr,
 ) {
+    dbg!();
+    // get the Reource from 3 different sources, if the expr.scope == 0, it will return the root_resource
+    // but if the expr_scope is not 0, it will depend on its expr.Mapping, if it's sender, get it from remote_mapping(key: expr_id)
+    // if it's receiver, get it from local_mapping's hashmap(key: expr_id)
     let rtables = zread!(tables.tables);
     match rtables
         .get_mapping(face, &expr.scope, expr.mapping)
         .cloned()
     {
+        // If get it(the scope is founded(?)), get the resource from remote_mapping with it's expr_id
         Some(mut prefix) => match face.remote_mappings.get(&expr_id) {
+            // get the resource from remote_mapping hashmap, if it's there,
             Some(res) => {
+                // then get the scope's full expression(fullexpr)
                 let mut fullexpr = prefix.expr();
+                // concat the fullexpr and the WireExpr's suffix (info fullexpr)
                 fullexpr.push_str(expr.suffix.as_ref());
+                // if the remote_mapping fullexpr isn't same as the fullexpr(the scope's fullexpr + WireExpr's suffix), it's error
                 if res.expr() != fullexpr {
                     tracing::error!(
                         "{} Resource {} remapped. Remapping unsupported!",
@@ -711,24 +1088,31 @@ pub(crate) fn register_expr(
                     );
                 }
             }
+            // If the expr_id is not in the remote_mapping row, 
             None => {
+                //Get the resource from the scope resource tree, find the Wire_expr's suffix resource
                 let res = Resource::get_resource(&prefix, &expr.suffix);
                 let (mut res, mut wtables) = if res
                     .as_ref()
                     .map(|r| r.context.is_some())
                     .unwrap_or(false)
+                //if the scope prefix + suffix's res.context is there
                 {
+                    // drop the read table here, we don't need it anymore cause we don't need to make resource()
                     drop(rtables);
                     let wtables = zwrite!(tables.tables);
                     (res.unwrap(), wtables)
+                //if the res.context is not there (no data route)
                 } else {
                     let mut fullexpr = prefix.expr();
                     fullexpr.push_str(expr.suffix.as_ref());
+                    // new the full_keyexpression 
                     let mut matches = keyexpr::new(fullexpr.as_str())
                         .map(|ke| Resource::get_matches(&rtables, ke))
                         .unwrap_or_default();
                     drop(rtables);
                     let mut wtables = zwrite!(tables.tables);
+                    //make the resource from the scope resource, return the leaf resource (res)
                     let mut res =
                         Resource::make_resource(&mut wtables, &mut prefix, expr.suffix.as_ref());
                     matches.push(Arc::downgrade(&res));
@@ -745,6 +1129,9 @@ pub(crate) fn register_expr(
                 get_mut_unchecked(face)
                     .remote_mappings
                     .insert(expr_id, res.clone());
+                // println!("'face.remote_mappings' is about to be printed now.");
+                // println!("{:?}",&face.remote_mappings);
+                // println!();
                 wtables.update_matches_routes(&mut res);
                 face.update_interceptors_caches(&mut res);
                 drop(wtables);

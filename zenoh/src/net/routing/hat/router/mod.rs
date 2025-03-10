@@ -24,7 +24,10 @@ use std::{
     sync::{atomic::AtomicU32, Arc},
 };
 
+use backtrace::Symbol;
+use petgraph::visit::FilterNode;
 use token::{token_linkstate_change, token_remove_node, undeclare_simple_token};
+use tracing::{info, debug};
 use zenoh_config::{unwrap_or_default, ModeDependent, WhatAmI, WhatAmIMatcher};
 use zenoh_protocol::{
     common::ZExtBody,
@@ -146,7 +149,7 @@ impl TreesComputationWorker {
                             .unwrap()
                             .compute_trees(),
                     };
-
+                    info!("{:?}",hat_mut!(tables).routers_net.as_ref());
                     tracing::trace!("Compute routes");
                     pubsub::pubsub_tree_change(&mut tables, &new_children, net_type);
                     queries::queries_tree_change(&mut tables, &new_children, net_type);
@@ -336,6 +339,7 @@ impl HatBaseTrait for HatCode {
                 autoconnect,
             ));
         }
+        dbg!(hat_mut!(tables).routers_net.as_ref());
         if peer_full_linkstate | gossip {
             hat_mut!(tables).linkstatepeers_net = Some(Network::new(
                 "[Peers network]".to_string(),
@@ -348,6 +352,7 @@ impl HatBaseTrait for HatCode {
                 autoconnect,
             ));
         }
+        dbg!(hat_mut!(tables).linkstatepeers_net.as_ref());
         if router_full_linkstate && peer_full_linkstate {
             hat_mut!(tables).shared_nodes = shared_nodes(
                 hat!(tables).routers_net.as_ref().unwrap(),
@@ -951,6 +956,22 @@ impl HatTrait for HatCode {}
 
 #[inline]
 fn get_routes_entries(tables: &Tables) -> RoutesIndexes {
+    // backtrace::trace(|frame|{
+    //     // let ip = frame.ip();
+    //     // let symbol_address = frame.symbol_address();
+    //     // dbg!(ip,symbol_address);
+    //     backtrace::resolve_frame(frame, |symbol|{
+    //         if let Some(name) = symbol.name(){
+    //             dbg!(name);
+    //         }
+    //         if let Some(filename) = symbol.filename(){
+    //             dbg!(filename);
+    //         }
+    //         dbg!();
+    //     });
+    //     true
+    // });
+    // panic!();
     let routers_indexes = hat!(tables)
         .routers_net
         .as_ref()
@@ -971,6 +992,9 @@ fn get_routes_entries(tables: &Tables) -> RoutesIndexes {
     } else {
         vec![0]
     };
+    dbg!(&routers_indexes);
+    dbg!(&peers_indexes);
+    // dbg!(hat!(tables).routers_net.as_ref());
     RoutesIndexes {
         routers: routers_indexes,
         peers: peers_indexes,

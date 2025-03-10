@@ -76,7 +76,7 @@ futures = { workspace = true }
 git-version = { workspace = true }
 itertools = { workspace = true }
 lazy_static = { workspace = true }
-tracing = { workspace = true }
+tracing.workspace = true
 paste = { workspace = true }
 petgraph = { workspace = true }
 phf = { workspace = true }
@@ -108,6 +108,8 @@ zenoh-util = { workspace = true }
 zenoh-runtime = { workspace = true }
 zenoh-task = { workspace = true }
 once_cell = { workspace = true }
+derive_more.workspace = true
+backtrace = "0.3.74"
 
 [dev-dependencies]
 tokio = { workspace = true }

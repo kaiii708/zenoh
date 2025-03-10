@@ -39,6 +39,8 @@ use crate::net::{
     runtime::Runtime,
 };
 
+use derive_more::Debug;
+
 #[derive(Clone)]
 struct Details {
     zid: bool,
@@ -61,6 +63,7 @@ impl std::fmt::Debug for Node {
     }
 }
 
+#[derive(Debug)]
 pub(super) struct Link {
     pub(super) transport: TransportUnicast,
     zid: ZenohIdProto,
@@ -106,25 +109,28 @@ pub(super) struct Changes {
     pub(super) removed_nodes: Vec<(NodeIndex, Node)>,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub(super) struct Tree {
     pub(super) parent: Option<NodeIndex>,
     pub(super) children: Vec<NodeIndex>,
     pub(super) directions: Vec<Option<NodeIndex>>,
 }
 
+#[derive(Debug)]
 pub(super) struct Network {
     pub(super) name: String,
     pub(super) full_linkstate: bool,
     pub(super) router_peers_failover_brokering: bool,
     pub(super) gossip: bool,
     pub(super) gossip_multihop: bool,
+    #[debug(skip)]
     pub(super) autoconnect: WhatAmIMatcher,
     pub(super) idx: NodeIndex,
     pub(super) links: VecMap<Link>,
     pub(super) trees: Vec<Tree>,
     pub(super) distances: Vec<f64>,
     pub(super) graph: petgraph::stable_graph::StableUnGraph<Node, f64>,
+    #[debug(skip)]
     pub(super) runtime: Runtime,
 }
 
@@ -142,6 +148,7 @@ impl Network {
     ) -> Self {
         let mut graph = petgraph::stable_graph::StableGraph::default();
         tracing::debug!("{} Add node (self) {}", name, zid);
+        dbg!();
         let idx = graph.add_node(Node {
             zid,
             whatami: Some(runtime.whatami()),
@@ -220,6 +227,7 @@ impl Network {
     }
 
     fn add_node(&mut self, node: Node) -> NodeIndex {
+        dbg!();
         let zid = node.zid;
         let idx = self.graph.add_node(node);
         for link in self.links.values_mut() {
@@ -231,6 +239,7 @@ impl Network {
     }
 
     fn make_link_state(&self, idx: NodeIndex, details: Details) -> LinkState {
+        dbg!();
         let links = if details.links {
             self.graph[idx]
                 .links
@@ -274,6 +283,7 @@ impl Network {
     }
 
     fn make_msg(&self, idxs: Vec<(NodeIndex, Details)>) -> Result<NetworkMessage, DidntWrite> {
+        dbg!();
         let mut link_states = vec![];
         for (idx, details) in idxs {
             link_states.push(self.make_link_state(idx, details));
@@ -291,6 +301,7 @@ impl Network {
     }
 
     fn send_on_link(&self, idxs: Vec<(NodeIndex, Details)>, transport: &TransportUnicast) {
+        dbg!();
         if let Ok(msg) = self.make_msg(idxs) {
             tracing::trace!("{} Send to {:?} {:?}", self.name, transport.get_zid(), msg);
             if let Err(e) = transport.schedule(msg) {
@@ -305,6 +316,7 @@ impl Network {
     where
         P: FnMut(&Link) -> bool,
     {
+        dbg!();
         if let Ok(msg) = self.make_msg(idxs) {
             for link in self.links.values() {
                 if parameters(link) {
@@ -324,6 +336,7 @@ impl Network {
     // Returns true if gossip is enabled and if multihop gossip is enabled or
     // the node is one of self neighbours.
     fn propagate_locators(&self, idx: NodeIndex) -> bool {
+        dbg!();
         self.gossip
             && (self.gossip_multihop
                 || idx == self.idx
@@ -336,6 +349,7 @@ impl Network {
     }
 
     fn update_edge(&mut self, idx1: NodeIndex, idx2: NodeIndex) {
+        dbg!();
         use std::hash::Hasher;
         let mut hasher = std::collections::hash_map::DefaultHasher::default();
         if self.graph[idx1].zid > self.graph[idx2].zid {
@@ -355,7 +369,7 @@ impl Network {
         src: ZenohIdProto,
     ) -> Changes {
         tracing::trace!("{} Received from {} raw: {:?}", self.name, src, link_states);
-
+        dbg!();
         let graph = &self.graph;
         let links = &mut self.links;
 
@@ -712,6 +726,7 @@ impl Network {
     }
 
     pub(super) fn add_link(&mut self, transport: TransportUnicast) -> usize {
+        dbg!();
         let free_index = {
             let mut i = 0;
             while self.links.contains_key(i) {
@@ -878,6 +893,7 @@ impl Network {
     }
 
     fn remove_detached_nodes(&mut self) -> Vec<(NodeIndex, Node)> {
+        dbg!();
         let mut dfs_stack = vec![self.idx];
         let mut visit_map = self.graph.visit_map();
         while let Some(node) = dfs_stack.pop() {
@@ -903,6 +919,7 @@ impl Network {
     }
 
     pub(super) fn compute_trees(&mut self) -> Vec<Vec<NodeIndex>> {
+        dbg!();
         let indexes = self.graph.node_indices().collect::<Vec<NodeIndex>>();
         let max_idx = indexes.iter().max().unwrap();
 
@@ -1005,6 +1022,7 @@ impl Network {
 
     #[inline]
     pub(super) fn get_links(&self, node: ZenohIdProto) -> &[ZenohIdProto] {
+        dbg!();
         self.get_node(&node)
             .map(|node| &node.links[..])
             .unwrap_or_default()
@@ -1013,6 +1031,7 @@ impl Network {
 
 #[inline]
 pub(super) fn shared_nodes(net1: &Network, net2: &Network) -> Vec<ZenohIdProto> {
+    dbg!();
     net1.graph
         .node_references()
         .filter_map(|(_, node1)| {

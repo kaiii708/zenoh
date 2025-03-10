@@ -833,6 +833,11 @@ pub(super) fn pubsub_tree_change(
 
     // recompute routes
     update_data_routes_from(tables, &mut tables.root_res.clone());
+
+    println!("[router] Now the resource tree after 'pubsub tree change' will print");
+    // dbg!();
+    println!("[router] root_res tree {:#?}",tables.root_res);
+    // println!(); 
 }
 
 pub(super) fn pubsub_linkstate_change(
@@ -1066,6 +1071,22 @@ impl HatPubSubTrait for HatCode {
         node_id: NodeId,
         send_declare: &mut SendDeclare,
     ) {
+        // backtrace::trace(|frame|{
+        //     // let ip = frame.ip();
+        //     // let symbol_address = frame.symbol_address();
+        //     // dbg!(ip,symbol_address);
+        //     backtrace::resolve_frame(frame, |symbol|{
+        //         if let Some(name) = symbol.name(){
+        //             dbg!(name);
+        //         }
+        //         if let Some(filename) = symbol.filename(){
+        //             dbg!(filename);
+        //         }
+        //         dbg!();
+        //     });
+        //     true
+        // });
+        
         match face.whatami {
             WhatAmI::Router => {
                 if let Some(router) = get_router(tables, face, node_id) {
@@ -1101,8 +1122,10 @@ impl HatPubSubTrait for HatCode {
         node_id: NodeId,
         send_declare: &mut SendDeclare,
     ) -> Option<Arc<Resource>> {
+        dbg!();
         match face.whatami {
             WhatAmI::Router => {
+                dbg!();
                 if let Some(mut res) = res {
                     if let Some(router) = get_router(tables, face, node_id) {
                         forget_router_subscription(tables, face, &mut res, &router, send_declare);
@@ -1240,6 +1263,7 @@ impl HatPubSubTrait for HatCode {
             }
         };
         let res = Resource::get_resource(expr.prefix, expr.suffix);
+        //Look like matches is the route result
         let matches = res
             .as_ref()
             .and_then(|res| res.context.as_ref())

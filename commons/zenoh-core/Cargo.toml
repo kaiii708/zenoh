@@ -36,3 +36,4 @@ tokio = { workspace = true, features = ["rt"] }
 lazy_static = { workspace = true }
 zenoh-result = { workspace = true }
 zenoh-runtime = { workspace = true }
+derive_more.workspace = true

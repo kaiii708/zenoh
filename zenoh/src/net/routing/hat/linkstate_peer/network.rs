@@ -39,6 +39,8 @@ use crate::net::{
     runtime::{Runtime, WeakRuntime},
 };
 
+use derive_more::Debug;
+
 #[derive(Clone)]
 struct Details {
     zid: bool,
@@ -61,6 +63,7 @@ impl std::fmt::Debug for Node {
     }
 }
 
+#[derive(Debug)]
 pub(super) struct Link {
     pub(super) transport: TransportUnicast,
     zid: ZenohIdProto,
@@ -113,18 +116,22 @@ pub(super) struct Tree {
     pub(super) directions: Vec<Option<NodeIndex>>,
 }
 
+#[derive(Debug)]
 pub(super) struct Network {
     pub(super) name: String,
     pub(super) full_linkstate: bool,
     pub(super) router_peers_failover_brokering: bool,
     pub(super) gossip: bool,
     pub(super) gossip_multihop: bool,
+    #[debug(skip)]
     pub(super) autoconnect: WhatAmIMatcher,
     pub(super) idx: NodeIndex,
     pub(super) links: VecMap<Link>,
+    #[debug(skip)]
     pub(super) trees: Vec<Tree>,
     pub(super) distances: Vec<f64>,
     pub(super) graph: petgraph::stable_graph::StableUnGraph<Node, f64>,
+    #[debug(skip)]
     pub(super) runtime: WeakRuntime,
 }
 

@@ -13,14 +13,13 @@
 //
 use std::{collections::HashMap, sync::Arc};
 
+use zenoh_config::defaults::scouting::multicast::autoconnect::client;
 use zenoh_core::zread;
 use zenoh_protocol::{
-    core::{key_expr::keyexpr, Reliability, WhatAmI, WireExpr},
-    network::{
+    core::{key_expr::keyexpr, Reliability, WhatAmI, WireExpr}, network::{
         declare::{ext, SubscriberId},
         Push,
-    },
-    zenoh::PushBody,
+    }, transport::join::flag::T, zenoh::PushBody
 };
 use zenoh_sync::get_mut_unchecked;
 
@@ -33,7 +32,7 @@ use super::{
 use crate::key_expr::KeyExpr;
 use crate::net::routing::hat::{HatTrait, SendDeclare};
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub(crate) struct SubscriberInfo;
 
 #[allow(clippy::too_many_arguments)]
@@ -48,10 +47,14 @@ pub(crate) fn declare_subscription(
     send_declare: &mut SendDeclare,
 ) {
     let rtables = zread!(tables.tables);
+    // get the Reource from 3 different sources, if the expr.scope == 0, it will return the root_resource
+    // but if the expr_scope is not 0, it will depend on its expr.Mapping, if it's sender, get it from remote_mapping(key: expr_id)
+    // if it's receiver, get it from local_mapping's hashmap(key: expr_id)
     match rtables
         .get_mapping(face, &expr.scope, expr.mapping)
         .cloned()
     {
+        // If get it(the scope is founded(?))
         Some(mut prefix) => {
             tracing::debug!(
                 "{} Declare subscriber {} ({}{})",
@@ -60,15 +63,21 @@ pub(crate) fn declare_subscription(
                 prefix.expr(),
                 expr.suffix
             );
+            // Get the resource from the scope resource tree, find the Wire_expr's suffix resource
             let res = Resource::get_resource(&prefix, &expr.suffix);
             let (mut res, mut wtables) =
+                // If the data route is there
                 if res.as_ref().map(|r| r.context.is_some()).unwrap_or(false) {
+                    // drop the read table, get the write table
                     drop(rtables);
                     let wtables = zwrite!(tables.tables);
                     (res.unwrap(), wtables)
                 } else {
+                    // if the data_route is not there,
+                    // get the full expression from scope, if zero, it will be root_res, or it will be remote_mapping or local_mapping's suffix
                     let mut fullexpr = prefix.expr();
                     fullexpr.push_str(expr.suffix.as_ref());
+                    //find the resources from the root_res of table, find all the matches key_expression resources
                     let mut matches = keyexpr::new(fullexpr.as_str())
                         .map(|ke| Resource::get_matches(&rtables, ke))
                         .unwrap_or_default();
@@ -99,6 +108,7 @@ pub(crate) fn declare_subscription(
             drop(rtables);
 
             let wtables = zwrite!(tables.tables);
+            // put the compute route path into resource tree
             for (mut res, data_routes) in matches_data_routes {
                 get_mut_unchecked(&mut res)
                     .context_mut()
@@ -224,6 +234,7 @@ pub(crate) fn compute_data_routes(tables: &Tables, expr: &mut RoutingExpr) -> Da
 }
 
 pub(crate) fn update_data_routes(tables: &Tables, res: &mut Arc<Resource>) {
+    
     if res.context.is_some() {
         let mut res_mut = res.clone();
         let res_mut = get_mut_unchecked(&mut res_mut);
@@ -233,6 +244,11 @@ pub(crate) fn update_data_routes(tables: &Tables, res: &mut Arc<Resource>) {
             &mut RoutingExpr::new(res, ""),
         );
     }
+    // println!("Now the tables after 'compute_data_routes' will print");
+    // dbg!();
+    // dbg!(tables);
+    // println!("root_res tree {:#?}",res);
+    // println!();
 }
 
 pub(crate) fn update_data_routes_from(tables: &mut Tables, res: &mut Arc<Resource>) {
@@ -394,6 +410,9 @@ pub fn route_data(
     mut msg: Push,
     reliability: Reliability,
 ) {
+    println!("route_data in dispatcher");
+    println!("Face: {:#?}", face);
+    println!("Message's wire_expr (if scope == 0, it will only show suffix):{:#?}", &msg.wire_expr);
     let tables = zread!(tables_ref.tables);
     match tables
         .get_mapping(face, &msg.wire_expr.scope, msg.wire_expr.mapping)
@@ -438,7 +457,10 @@ pub fn route_data(
                             } else {
                                 inc_stats!(face, tx, admin, msg.payload)
                             }
-
+                            println!("Now is going to Push the message");
+                            println!("Outgoing interface: {:#?}", &outface);
+                            println!("the WireExpr in the route: {:#?}", key_expr);
+                            println!("the context node_id: {}", context);    
                             outface.primitives.send_push(
                                 Push {
                                     wire_expr: key_expr.into(),
@@ -469,7 +491,11 @@ pub fn route_data(
                             } else {
                                 inc_stats!(face, tx, admin, msg.payload)
                             }
-
+                            println!("In tables.whatami == WhatAmI::Router part");
+                            println!("Now is going to Push the message");
+                            println!("Outgoing interface: {:#?}", &outface);
+                            println!("the WireExpr in the route: {:#?}", key_expr);
+                            println!("the context node_id: {}", context); 
                             outface.primitives.send_push(
                                 Push {
                                     wire_expr: key_expr,

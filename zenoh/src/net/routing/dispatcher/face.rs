@@ -46,32 +46,74 @@ use crate::{
         routing::interceptor::{InterceptorTrait, InterceptorsChain},
     },
 };
+use derive_more::Debug;
 
+#[derive(Debug)]
 pub(crate) struct InterestState {
     pub(crate) options: InterestOptions,
+    #[debug(skip)]
     pub(crate) res: Option<Arc<Resource>>,
     pub(crate) finalized: bool,
 }
 
+// #[derive(Debug)]
 pub struct FaceState {
     pub(crate) id: usize,
     pub(crate) zid: ZenohIdProto,
     pub(crate) whatami: WhatAmI,
     #[cfg(feature = "stats")]
     pub(crate) stats: Option<Arc<TransportStats>>,
+    
     pub(crate) primitives: Arc<dyn crate::net::primitives::EPrimitives + Send + Sync>,
+    
     pub(crate) local_interests: HashMap<InterestId, InterestState>,
+    
     pub(crate) remote_key_interests: HashMap<InterestId, Option<Arc<Resource>>>,
+    
     pub(crate) pending_current_interests:
         HashMap<InterestId, (Arc<CurrentInterest>, CancellationToken)>,
+    
     pub(crate) local_mappings: HashMap<ExprId, Arc<Resource>>,
+    
     pub(crate) remote_mappings: HashMap<ExprId, Arc<Resource>>,
+    
     pub(crate) next_qid: RequestId,
+    
     pub(crate) pending_queries: HashMap<RequestId, (Arc<Query>, CancellationToken)>,
+    
     pub(crate) mcast_group: Option<TransportMulticast>,
+    
     pub(crate) in_interceptors: Option<Arc<InterceptorsChain>>,
+    
     pub(crate) hat: Box<dyn Any + Send + Sync>,
+    
     pub(crate) task_controller: TaskController,
+}
+
+impl fmt::Debug for FaceState{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut facestate = f.debug_struct("FaceState");
+        facestate.field("id", &self.id)
+            .field("zid",&self.zid)
+            .field("whatami", &self.whatami);
+        facestate.field("local_mappings", &organize_hashmap(&self.local_mappings))
+                .field("remote_mappings", &organize_hashmap(&self.remote_mappings))
+                .finish()
+    }
+}
+
+pub fn organize_hashmap(res_hashmap: &HashMap<ExprId, Arc<Resource>>) -> String {
+    res_hashmap
+        .iter()
+        .map(|(expr_id, resource)| {
+            format!(
+                "ExprId: {:?}, Resource: {}",
+                expr_id,
+                Resource::format_for_no_recursive(resource)
+            )
+        })
+        .collect::<Vec<String>>()
+        .join(", ")
 }
 
 impl FaceState {
@@ -241,6 +283,9 @@ impl Primitives for Face {
     }
 
     fn send_declare(&self, msg: zenoh_protocol::network::Declare) {
+        println!("");
+        println!("In send_declare function");
+        println!("{:#?}",&msg);
         let ctrl_lock = zlock!(self.tables.ctrl_lock);
         match msg.body {
             zenoh_protocol::network::DeclareBody::DeclareKeyExpr(m) => {
@@ -376,14 +421,32 @@ impl Primitives for Face {
                 }
             }
         }
+        println!("After send_declare, this face information");
+        if let Some(face_state) = self.downgrade().state.upgrade() {
+            println!("FaceState: {:#?}", face_state);
+        } else {
+            println!("FaceState: (Dropped)");
+        }
+        if let Some(tables_lock) = self.downgrade().tables.upgrade() {
+            let tables = tables_lock.tables.read().unwrap();
+            println!("Tables: {:#?}", *tables);
+        } else {
+            println!("Tables: (Dropped)");
+        }
     }
 
     #[inline]
     fn send_push(&self, msg: Push, reliability: Reliability) {
+        println!("");
+        println!("In send_push function");
+        println!("{:#?}",&msg);
         route_data(&self.tables, &self.state, msg, reliability);
     }
 
     fn send_request(&self, msg: Request) {
+        // println!("");
+        // println!("In send_request function");
+        // println!("{:#?}",&msg);
         match msg.payload {
             RequestBody::Query(_) => {
                 route_query(
@@ -404,6 +467,9 @@ impl Primitives for Face {
     }
 
     fn send_response(&self, msg: Response) {
+        // println!("");
+        // println!("In send_response function");
+        // println!("{:#?}",&msg);
         route_send_response(
             &self.tables,
             &mut self.state.clone(),
@@ -427,6 +493,7 @@ impl Primitives for Face {
 
 impl fmt::Display for Face {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        self.state.fmt(f)
+        // self.state.fmt(f)
+        std::fmt::Display::fmt(&self.state, f)
     }
 }

@@ -41,8 +41,11 @@ use crate::net::routing::{
     RoutingContext,
 };
 
+use derive_more::Debug;
+
 static INTEREST_TIMEOUT_MS: u64 = 10000;
 
+#[derive(Debug)]
 pub(crate) struct CurrentInterest {
     pub(crate) src_face: Arc<FaceState>,
     pub(crate) src_interest_id: InterestId,

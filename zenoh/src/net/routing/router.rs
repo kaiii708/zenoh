@@ -94,6 +94,7 @@ impl Router {
                 )
             })
             .clone();
+        println!("[Router] New {} In new_primitives", newface);
         tracing::debug!("New {}", newface);
 
         let mut face = Face {
@@ -153,6 +154,7 @@ impl Router {
                 )
             })
             .clone();
+        println!("[Router] New {} In new_transport_unicast", newface);
         tracing::debug!("New {}", newface);
 
         let mut face = Face {
@@ -180,6 +182,7 @@ impl Router {
     }
 
     pub fn new_transport_multicast(&self, transport: TransportMulticast) -> ZResult<()> {
+        dbg!("new_transport_multicast");
         let ctrl_lock = zlock!(self.tables.ctrl_lock);
         let mut tables = zwrite!(self.tables.tables);
         let fid = tables.face_counter;
@@ -207,6 +210,7 @@ impl Router {
             state: face.clone(),
             tables: self.tables.clone(),
         });
+        println!("[Router] New {} In new_transport_multicast", face);
         tables.mcast_groups.push(face);
 
         // recompute routes
@@ -243,7 +247,7 @@ impl Router {
             ctrl_lock.new_face(),
         );
         tables.mcast_faces.push(face_state.clone());
-
+        println!("[Router] New {} In new_transport_multicast", face_state);
         // recompute routes
         let mut root_res = tables.root_res.clone();
         update_data_routes_from(&mut tables, &mut root_res);
