@@ -111,9 +111,6 @@ once_cell = { workspace = true }
 derive_more.workspace = true
 backtrace = "0.3.74"
 
-[target.'cfg(target_os = "linux")'.dependencies]
-inotify = "0.10"
-
 [dev-dependencies]
 tokio = { workspace = true }
 

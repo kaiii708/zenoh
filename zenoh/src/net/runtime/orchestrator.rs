@@ -1461,77 +1461,21 @@ const HANDOVER_FILE: &str = "/mnt/ns3_handover_event.json";
 
 /// Spawns a handover watcher that monitors /mnt/ns3_handover_event.json
 /// and triggers connection switching when a handover_start event is detected.
+/// Uses 1ms polling for reliability in Docker environments (inotify doesn't work with bind mounts).
 pub async fn spawn_handover_watcher(runtime: Runtime, transport: TransportUnicast) {
-    let mut last_timestamp: Option<u64> = None;
+    // Initialize with current timestamp to avoid re-triggering on existing event
+    let mut last_timestamp: Option<u64> = get_current_handover_timestamp(HANDOVER_FILE);
     let cancellation_token = runtime.get_cancellation_token();
 
-    #[cfg(target_os = "linux")]
-    {
-        use inotify::{Inotify, WatchMask};
-        use std::os::fd::AsRawFd;
-        use std::path::Path;
-        use std::sync::Arc;
+    tracing::info!("Handover watcher: monitoring {} with 1ms polling", HANDOVER_FILE);
 
-        let inotify = match Inotify::init() {
-            Ok(i) => i,
-            Err(e) => {
-                tracing::error!("Handover watcher: failed to init inotify: {}", e);
-                return;
+    loop {
+        tokio::select! {
+            _ = cancellation_token.cancelled() => {
+                tracing::debug!("Handover watcher: cancelled");
+                break;
             }
-        };
-
-        // Watch the file or parent directory if file doesn't exist yet
-        let watch_path = if Path::new(HANDOVER_FILE).exists() {
-            HANDOVER_FILE
-        } else {
-            "/mnt"
-        };
-
-        if let Err(e) = inotify
-            .watches()
-            .add(watch_path, WatchMask::MODIFY | WatchMask::CLOSE_WRITE | WatchMask::CREATE)
-        {
-            tracing::error!("Handover watcher: failed to add watch for {}: {}", watch_path, e);
-            return;
-        }
-
-        tracing::info!("Handover watcher: monitoring {} via inotify", watch_path);
-
-        // Use Arc<Mutex> to share inotify between blocking thread and async task
-        let inotify = Arc::new(std::sync::Mutex::new(inotify));
-
-        loop {
-            let has_events = tokio::select! {
-                _ = cancellation_token.cancelled() => {
-                    tracing::debug!("Handover watcher: cancelled");
-                    break;
-                }
-                result = {
-                    let inotify = inotify.clone();
-                    tokio::task::spawn_blocking(move || {
-                        let mut buffer = [0; 1024];
-                        let mut inotify = inotify.lock().unwrap();
-                        // This blocks until events arrive (sub-millisecond response)
-                        match inotify.read_events_blocking(&mut buffer) {
-                            Ok(events) => events.count() > 0,
-                            Err(e) => {
-                                tracing::error!("Handover watcher: inotify error: {}", e);
-                                false
-                            }
-                        }
-                    })
-                } => {
-                    match result {
-                        Ok(has_events) => has_events,
-                        Err(e) => {
-                            tracing::error!("Handover watcher: spawn_blocking error: {}", e);
-                            false
-                        }
-                    }
-                }
-            };
-
-            if has_events {
+            _ = tokio::time::sleep(Duration::from_millis(1)) => {
                 if let Some(new_endpoint) = read_handover_event(HANDOVER_FILE, &mut last_timestamp) {
                     tracing::info!("Handover detected, switching to {}", new_endpoint);
 
@@ -1595,73 +1539,6 @@ pub async fn spawn_handover_watcher(runtime: Runtime, transport: TransportUnicas
             }
         }
     }
-
-    #[cfg(not(target_os = "linux"))]
-    {
-        tracing::info!("Handover watcher: using polling fallback (non-Linux)");
-
-        loop {
-            tokio::select! {
-                _ = cancellation_token.cancelled() => {
-                    tracing::debug!("Handover watcher: cancelled");
-                    break;
-                }
-                _ = tokio::time::sleep(Duration::from_millis(100)) => {
-                    if let Some(new_endpoint) = read_handover_event(HANDOVER_FILE, &mut last_timestamp) {
-                        tracing::info!("Handover detected, switching to {}", new_endpoint);
-
-                        // Close current transport
-                        if let Err(e) = transport.close().await {
-                            tracing::warn!("Handover watcher: failed to close transport: {}", e);
-                        }
-
-                        // Directly connect to the target mapped endpoint
-                        let retry_config = runtime.get_connect_retry_config(&new_endpoint);
-                        let timeout = retry_config.timeout();
-
-                        loop {
-                            if cancellation_token.is_cancelled() {
-                                break;
-                            }
-
-                            match tokio::time::timeout(
-                                timeout,
-                                runtime.manager().open_transport_unicast(new_endpoint.clone()),
-                            )
-                            .await
-                            {
-                                Ok(Ok(new_transport)) => {
-                                    tracing::info!("Handover: connected to {}", new_endpoint);
-                                    if let Ok(Some(callback)) = new_transport.get_callback() {
-                                        if let Some(session) =
-                                            callback.as_any().downcast_ref::<RuntimeSession>()
-                                        {
-                                            *zwrite!(session.endpoint) = Some(new_endpoint.clone());
-                                        }
-                                    }
-                                    return;
-                                }
-                                Ok(Err(e)) => {
-                                    tracing::warn!(
-                                        "Handover: failed to connect to {}: {}",
-                                        new_endpoint,
-                                        e
-                                    );
-                                }
-                                Err(_) => {
-                                    tracing::warn!("Handover: connection to {} timed out", new_endpoint);
-                                }
-                            }
-
-                            // Wait before retry (1ms for minimum latency)
-                            tokio::time::sleep(Duration::from_millis(1)).await;
-                        }
-                        break;
-                    }
-                }
-            }
-        }
-    }
 }
 
 fn read_handover_event(path: &str, last_timestamp: &mut Option<u64>) -> Option<EndPoint> {
@@ -1670,8 +1547,7 @@ fn read_handover_event(path: &str, last_timestamp: &mut Option<u64>) -> Option<E
 
     let event = json.get("event")?.as_str()?;
     // Accept both handover_start and handover_success events
-    // (handover_start may be missed due to 2ms interval between events)
-    if event != "handover_start" {
+    if event != "handover_start" && event != "handover_success" {
         return None;
     }
 
@@ -1696,4 +1572,12 @@ fn map_ip_to_endpoint(ip: &str) -> Option<EndPoint> {
     } else {
         None
     }
+}
+
+/// Read the current timestamp from the handover event file (if it exists)
+/// Used to initialize the watcher so it doesn't re-trigger on existing events
+fn get_current_handover_timestamp(path: &str) -> Option<u64> {
+    let content = std::fs::read_to_string(path).ok()?;
+    let json: serde_json::Value = serde_json::from_str(&content).ok()?;
+    json.get("timestamp_ms")?.as_u64()
 }
