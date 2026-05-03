@@ -353,7 +353,6 @@ impl HatBaseTrait for HatCode {
                 autoconnect,
             ));
         }
-        dbg!(hat_mut!(tables).routers_net.as_ref());
         if peer_full_linkstate | gossip {
             hat_mut!(tables).linkstatepeers_net = Some(Network::new(
                 "[Peers network]".to_string(),
@@ -366,7 +365,6 @@ impl HatBaseTrait for HatCode {
                 autoconnect,
             ));
         }
-        dbg!(hat_mut!(tables).linkstatepeers_net.as_ref());
         if router_full_linkstate && peer_full_linkstate {
             hat_mut!(tables).shared_nodes = shared_nodes(
                 hat!(tables).routers_net.as_ref().unwrap(),
@@ -1102,9 +1100,6 @@ fn get_routes_entries(tables: &Tables) -> RoutesIndexes {
     } else {
         vec![0]
     };
-    dbg!(&routers_indexes);
-    dbg!(&peers_indexes);
-    // dbg!(hat!(tables).routers_net.as_ref());
     RoutesIndexes {
         routers: routers_indexes,
         peers: peers_indexes,

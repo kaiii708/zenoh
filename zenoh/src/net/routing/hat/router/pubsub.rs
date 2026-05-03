@@ -354,9 +354,9 @@ fn propagate_sourced_presubscription(
     let net = hat!(tables).get_net(net_type).unwrap();
     match (net.get_idx(source), net.get_idx(target_router)) {
         (Some(tree_sid), Some(target_router_id)) => {
-            print!("propagate_source_presubscription");
-            print!("This is net: {:#?}", &net);
-            print!("This is net trees: {:#?}", &net.trees[tree_sid.index()]);
+            tracing::trace!("propagate_source_presubscription");
+            tracing::trace!("This is net: {:#?}", &net);
+            tracing::trace!("This is net trees: {:#?}", &net.trees[tree_sid.index()]);
             if net.trees.len() > tree_sid.index() {
                 send_presubscription_to_target_direction(
                     tables,
@@ -447,7 +447,7 @@ fn register_router_subscription(
     router: ZenohIdProto,
     send_declare: &mut SendDeclare,
 ) {
-    println!(
+    tracing::trace!(
         "Register_router_subscription: the modity resource context {}",
         Resource::format_for_no_recursive(&res)
     );
@@ -1914,10 +1914,8 @@ impl HatPubSubTrait for HatCode {
         node_id: NodeId,
         send_declare: &mut SendDeclare,
     ) -> Option<Arc<Resource>> {
-        dbg!();
         match face.whatami {
             WhatAmI::Router => {
-                dbg!();
                 if let Some(mut res) = res {
                     if let Some(router) = get_router(tables, face, node_id) {
                         forget_router_subscription(tables, face, &mut res, &router, send_declare);

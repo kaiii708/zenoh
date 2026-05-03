@@ -225,9 +225,9 @@ pub(crate) fn declare_presubscription(
     // (to make the path between the target node and the source node: quick path)
     {
         let rtables = zread!(tables_ref.tables);
-        println!("hat_code info: {}", hat_code.info(&rtables, face.whatami));
-        println!("Now the resource tree after 'declare_presubscription' will print");
-        println!("root_res tree {:#?}", rtables._get_root());
+        tracing::trace!("hat_code info: {}", hat_code.info(&rtables, face.whatami));
+        tracing::trace!("Now the resource tree after 'declare_presubscription' will print");
+        tracing::trace!("root_res tree {:#?}", rtables._get_root());
     }
 }
 
@@ -295,9 +295,9 @@ pub(crate) fn declare_routeupdate(
     }
     {
         let rtables = zread!(tables.tables);
-        println!("hat_code info: {}", hat_code.info(&rtables, face.whatami));
-        println!("Now the resource tree after 'declare_routeupdate' will print");
-        println!("root_res tree {:#?}", rtables._get_root());
+        tracing::debug!("hat_code info: {}", hat_code.info(&rtables, face.whatami));
+        tracing::debug!("Now the resource tree after 'declare_routeupdate' will print");
+        tracing::debug!("root_res tree {:#?}", rtables._get_root());
     }
 }
 
@@ -360,12 +360,6 @@ pub(crate) fn undeclare_subscription(
     } else {
         // NOTE: This is expected behavior if subscriber declarations are denied with ingress ACL interceptor.
         tracing::debug!("{} Undeclare unknown subscriber {}", face, id);
-    }
-    {
-        let rtables = zread!(tables.tables);
-        println!("hat_code info: {}", hat_code.info(&rtables, face.whatami));
-        println!("Now the resource tree after 'undeclare_subscription' will print");
-        println!("root_res tree {:#?}", rtables._get_root());
     }
 }
 

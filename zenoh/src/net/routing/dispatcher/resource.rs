@@ -1114,7 +1114,6 @@ pub(crate) fn register_expr(
     expr_id: ExprId,
     expr: &WireExpr,
 ) {
-    dbg!();
     // get the Reource from 3 different sources, if the expr.scope == 0, it will return the root_resource
     // but if the expr_scope is not 0, it will depend on its expr.Mapping, if it's sender, get it from remote_mapping(key: expr_id)
     // if it's receiver, get it from local_mapping's hashmap(key: expr_id)

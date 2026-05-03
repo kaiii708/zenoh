@@ -287,36 +287,36 @@ impl Primitives for Face {
     }
 
     fn send_declare(&self, msg: zenoh_protocol::network::Declare) {
-        println!("");
-        println!("In send_declare function");
-        backtrace::trace(|frame|{
-            // let ip = frame.ip();
-            // let symbol_address = frame.symbol_address();
-            // dbg!(ip,symbol_address);
-            backtrace::resolve_frame(frame, |symbol|{
-                if let Some(name) = symbol.name(){
-                    println!("Name: {}", name);
-                }
-                if let Some(filename) = symbol.filename(){
-                    println!("In file: {:?}",filename);
-                }
-                println!();
-            });
-            true
-        });
-        println!("{:#?}",&msg);
-        println!("Face information");
-        if let Some(face_state) = self.downgrade().state.upgrade() {
-            println!("FaceState: {:#?}", face_state);
-        } else {
-            println!("FaceState: (Dropped)");
-        }
-        if let Some(tables_lock) = self.downgrade().tables.upgrade() {
-            let tables = tables_lock.tables.read().unwrap();
-            println!("Tables: {:#?}", *tables);
-        } else {
-            println!("Tables: (Dropped)");
-        }
+        // println!("");
+        // println!("In send_declare function");
+        // backtrace::trace(|frame|{
+        //     // let ip = frame.ip();
+        //     // let symbol_address = frame.symbol_address();
+        //     // dbg!(ip,symbol_address);
+        //     backtrace::resolve_frame(frame, |symbol|{
+        //         if let Some(name) = symbol.name(){
+        //             println!("Name: {}", name);
+        //         }
+        //         if let Some(filename) = symbol.filename(){
+        //             println!("In file: {:?}",filename);
+        //         }
+        //         println!();
+        //     });
+        //     true
+        // });
+        // println!("{:#?}",&msg);
+        // println!("Face information");
+        // if let Some(face_state) = self.downgrade().state.upgrade() {
+        //     println!("FaceState: {:#?}", face_state);
+        // } else {
+        //     println!("FaceState: (Dropped)");
+        // }
+        // if let Some(tables_lock) = self.downgrade().tables.upgrade() {
+        //     let tables = tables_lock.tables.read().unwrap();
+        //     println!("Tables: {:#?}", *tables);
+        // } else {
+        //     println!("Tables: (Dropped)");
+        // }
         let ctrl_lock = zlock!(self.tables.ctrl_lock);
         match msg.body {
             zenoh_protocol::network::DeclareBody::DeclareKeyExpr(m) => {
