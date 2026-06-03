@@ -75,6 +75,7 @@ fn send_sourced_subscription_to_net_children(
                         let push_declaration = push_declaration_profile(tables, &someface);
                         let key_expr = Resource::decl_key(res, &mut someface, push_declaration);
 
+                        eprintln!("[PACKET_COUNT] DeclareSubscriber sent to {}", someface.zid);
                         someface.primitives.send_declare(RoutingContext::with_expr(
                             Declare {
                                 interest_id: None,
@@ -123,6 +124,7 @@ fn send_presubscription_to_target_direction(
                         let push_declaration = push_declaration_profile(tables, &someface);
                         let key_expr = Resource::decl_key(res, &mut someface, push_declaration);
                         tracing::trace!("send_presubscription_to_target_direction {}",someface.zid);
+                        eprintln!("[PACKET_COUNT] DeclarePreSubscriber sent to {}", someface.zid);
                         someface.primitives.send_declare(RoutingContext::with_expr(
                             Declare {
                                 interest_id: None,
@@ -181,6 +183,7 @@ fn send_routeupdate_to_convergence(
                             let push_declaration = push_declaration_profile(tables, &someface);
                             let key_expr = Resource::decl_key(res, &mut someface, push_declaration);
                             tracing::trace!("send_routeupdate_to_convergence {}",someface.zid);
+                            eprintln!("[PACKET_COUNT] DeclareRouteUpdate sent to {}", someface.zid);
                             someface.primitives.send_declare(RoutingContext::with_expr(
                                 Declare {
                                     interest_id: None,

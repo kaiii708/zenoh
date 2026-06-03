@@ -326,6 +326,9 @@ impl Primitives for Face {
                 unregister_expr(&self.tables, &mut self.state.clone(), m.id);
             }
             zenoh_protocol::network::DeclareBody::DeclareSubscriber(m) => {
+                let ts = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH).unwrap().as_micros();
+                eprintln!("[PACKET_COUNT] DeclareSubscriber received timestamp_us={ts}");
                 let mut declares = vec![];
                 declare_subscription(
                     ctrl_lock.as_ref(),
@@ -343,6 +346,9 @@ impl Primitives for Face {
                 }
             }
             zenoh_protocol::network::DeclareBody::DeclarePreSubscriber(m) => {
+                let ts = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH).unwrap().as_micros();
+                eprintln!("[PACKET_COUNT] DeclarePreSubscriber received timestamp_us={ts}");
                 let mut declares = vec![];
                 declare_presubscription(
                     ctrl_lock.as_ref(),
@@ -363,6 +369,9 @@ impl Primitives for Face {
                 }
             }
             zenoh_protocol::network::DeclareBody::DeclareRouteUpdate(m) => {
+                let ts = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH).unwrap().as_micros();
+                eprintln!("[PACKET_COUNT] DeclareRouteUpdate received timestamp_us={ts}");
                 let mut declares = vec![];
                 declare_routeupdate(
                     ctrl_lock.as_ref(),
