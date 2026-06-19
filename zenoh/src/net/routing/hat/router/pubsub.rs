@@ -854,7 +854,12 @@ fn declare_simple_presubscription(
     tokio::spawn(async move {
         let mut last_target: Option<ZenohIdProto> = None;
         // The prediction generator on the ns-3 side only fires every 480ms; polling faster would waste CPU cycles.
-        let mut interval = tokio::time::interval(Duration::from_millis(480));
+        // Use interval_at to skip the immediate first tick — avoids a spurious RouteUpdate when the client
+        // just connected to the predicted target and the prediction file still points there.
+        let mut interval = tokio::time::interval_at(
+            tokio::time::Instant::now() + Duration::from_millis(480),
+            Duration::from_millis(480),
+        );
 
         loop {
             tokio::select! {
@@ -865,6 +870,7 @@ fn declare_simple_presubscription(
                 _ = interval.tick() => {
                     if let Some(new_target) = get_target_router_from_prediction() {
                         if last_target.as_ref() != Some(&new_target) {
+                            eprintln!("New target router detected: {}", new_target);
                             tracing::trace!("New target router detected: {} for subscriber {}", new_target, face_zid);
                             last_target = Some(new_target);
 
