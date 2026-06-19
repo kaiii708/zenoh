@@ -75,7 +75,7 @@ fn send_sourced_subscription_to_net_children(
                         let push_declaration = push_declaration_profile(tables, &someface);
                         let key_expr = Resource::decl_key(res, &mut someface, push_declaration);
 
-                        eprintln!("[PACKET_COUNT] DeclareSubscriber sent to {}", someface.zid);
+                        // eprintln!("[{}] [PACKET_COUNT] DeclareSubscriber sent to {}", humantime::format_rfc3339_micros(std::time::SystemTime::now()), someface.zid);
                         someface.primitives.send_declare(RoutingContext::with_expr(
                             Declare {
                                 interest_id: None,
@@ -105,6 +105,7 @@ fn send_presubscription_to_target_direction(
     net: &Network,
     tree: &Tree,
     target_router_id: NodeId,
+    target_router: &ZenohIdProto,
     sync_info: SyncInfo,
     estimated_time: Duration,
     id: SubscriberId,
@@ -124,7 +125,7 @@ fn send_presubscription_to_target_direction(
                         let push_declaration = push_declaration_profile(tables, &someface);
                         let key_expr = Resource::decl_key(res, &mut someface, push_declaration);
                         tracing::trace!("send_presubscription_to_target_direction {}",someface.zid);
-                        eprintln!("[PACKET_COUNT] DeclarePreSubscriber sent to {}", someface.zid);
+                        eprintln!("[{}] [PACKET_COUNT] DeclarePreSubscriber sent to {} via {}", humantime::format_rfc3339_micros(std::time::SystemTime::now()), target_router, someface.zid);
                         someface.primitives.send_declare(RoutingContext::with_expr(
                             Declare {
                                 interest_id: None,
@@ -183,7 +184,7 @@ fn send_routeupdate_to_convergence(
                             let push_declaration = push_declaration_profile(tables, &someface);
                             let key_expr = Resource::decl_key(res, &mut someface, push_declaration);
                             tracing::trace!("send_routeupdate_to_convergence {}",someface.zid);
-                            eprintln!("[PACKET_COUNT] DeclareRouteUpdate sent to {}", someface.zid);
+                            eprintln!("[{}] [PACKET_COUNT] DeclareRouteUpdate sent to {}", humantime::format_rfc3339_micros(std::time::SystemTime::now()), someface.zid);
                             someface.primitives.send_declare(RoutingContext::with_expr(
                                 Declare {
                                     interest_id: None,
@@ -366,6 +367,7 @@ fn propagate_sourced_presubscription(
                     net,
                     &net.trees[tree_sid.index()],
                     target_router_id.index() as NodeId,
+                    target_router,
                     sync_info,
                     estimated_time,
                     id,
